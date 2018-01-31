@@ -1,0 +1,62 @@
+units             lj
+atom_style        atomic
+boundary          p p p
+
+variable l equal 18.5  # correct for CN 11, 0.1 T (lj units); depends on lj parameters, including cutoff
+region boxid block  0.0 ${l}  0.0 ${l}  0.0 ${l}
+create_box 2 boxid
+
+variable s equal 667
+variable l equal 333
+create_atoms 1 random {s} 9879 boxid 
+create_atoms 2 random {l} 8987 boxid
+
+mass 1 1.0
+mass 2 1.0
+
+velocity all create 1.0 87287 dist gaussian
+
+pair_style lj/cut 6
+pair_coeff 1 1 10.0 1.7817974363 6
+pair_coeff 2 2 10.0 2.0156079596 6
+pair_coeff 1 2 12.0 1.8987026979 6
+
+dump dump_name all custom 100 tmp.dump element x y z 
+dump_modify dump_name element Cu Zr
+dump_modify dump_name sort id
+
+#thermo_style custom step pe ke etotal temp press density lx
+thermo_style custom step pe temp press lx
+thermo 100
+thermo_modify norm no
+
+# CGM to alleviate any major issues withthe initial atom positions
+minimize          1.0e-4 1.0e-6 10000 100000
+
+timestep 0.001
+
+# Equilibrate the current box so alleviate any other issues with the initial atom positions
+fix md all nve
+run 5000
+unfix md
+
+# CGM again before we start the real MD
+minimize          1.0e-4 1.0e-6 10000 100000
+
+# Let the box size equilibrate at low T and 1 P
+fix md all npt temp 0.1 0.1 0.1 iso 1 1 1
+run 50000
+unfix md
+
+# Heat up the system to a liquid
+fix md all npt temp 0.1 20 1.0 iso 1 1 1  # thermostat controller gain = 0.1 (units of time, bigger is less tight control)
+run 500000
+unfix md
+
+# Quench the liquid
+fix md all npt temp 20 0.1 1.0 iso 1 1 1
+run 500000
+unfix md
+
+# Finalize with a CGM
+minimize          1.0e-4 1.0e-6 10000 100000

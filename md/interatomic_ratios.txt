@@ -1,0 +1,1 @@
+../cgm/interatomic_ratios.txt
