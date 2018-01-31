@@ -1,0 +1,123 @@
+#
+
+units             lj
+atom_style        atomic
+boundary          p p p
+
+#read_data     modelinput.dat
+#lattice bcc 1.2
+#region my_box block 0 8 0 8 0 8
+#create_box 2 my_box
+#create_atoms 2 box
+#set group all type/fraction 1 0.33 341341
+
+variable l      equal 19.6
+region      boxid block 0.0       ${l}      0.0       ${l}      0.0       ${l}
+create_box  2 boxid
+create_atoms    1 random 667  9879 boxid 
+create_atoms    2 random 333  8987 boxid
+
+
+mass 1 1.0 
+mass 2 1.0 
+
+pair_style lj/cut 2.5  # maybe  need ~ 12
+#pair_coeff 1 1 1.0 0.8908987181403393 2.5
+#pair_coeff 2 2 1.0 1.007803979796764 2.5
+#pair_coeff 1 2 1.2 0.9493513489685516 2.5
+# R* = 0.884 for CN 11
+pair_coeff 1 1 10.0 1.7817974363 2.5
+pair_coeff 2 2 10.0 2.0156079596 2.5
+pair_coeff 1 2 12.0 1.8987026979 2.5
+
+pair_modify tail yes 
+
+#thermo_style custom step pe ke etotal temp press density
+thermo_style custom step pe ke temp press vol lx ly lz
+thermo 100
+thermo_modify norm no
+thermo_modify   flush yes 
+
+dump dump_name all custom 100 tmp.dump element x y z 
+dump_modify dump_name element Zr Cu
+dump_modify dump_name sort id
+#dump dump_name all custom 10 tmp.dump id type x y z 
+
+minimize    1.0e-6 0 1000 10000
+# OR run nve/limit 100,000
+
+timestep 0.001
+
+#------------------------------------------------------------------
+#  Initial velocities and timestep (ps).
+#------------------------------------------------------------------
+
+
+
+
+variable imax equal 10
+
+variable i loop ${imax}
+
+label start_of_loop_1
+
+fix 1 all nve 
+velocity        all create 400 4928459 mom yes rot yes dist gaussian
+run 200
+unfix 1
+
+minimize    1.0e-6 0 1000 10000
+
+next i
+jump 11.in start_of_loop_1
+
+fix     1 all nve
+run 1000
+unfix 1
+
+
+
+fix 1 all nve 
+velocity        all create 400 4928459 mom yes rot yes dist gaussian
+run 1000
+unfix 1
+
+
+fix             md all npt temp 400 400 0.1 iso 0 0 1
+run 5000
+unfix md
+
+fix             md all npt temp 400 1000 0.1 iso 0 0 1
+run 20000
+unfix md
+
+
+fix             md all npt temp 1000 1000 0.1 iso 0 0 1
+run 5000
+unfix md
+
+variable imax equal 19
+
+variable i loop ${imax}
+
+label start_of_loop_1
+
+variable tin equal 1000-${i}*50
+variable tfi equal 950-${i}*50
+
+fix     nnn all npt temp ${tin} ${tfi} 0.1 iso 0 0 1 
+run 5000
+unfix           nnn
+
+fix             md all npt temp ${tfi} ${tfi} 0.1 iso 0 0 1
+run 5000
+unfix md
+
+next i
+jump 11.in start_of_loop_1
+
+fix             md all npt temp 50 1 0.1 iso 0 0 1
+run 5000
+
+fix             md all npt temp 1 1 0.1 iso 0 0 1
+run 5000

@@ -1,0 +1,31 @@
+
+units             metal  
+atom_style        atomic
+boundary          f f f 
+
+read_data     input_models/11.dat
+
+mass 1 1.0 
+mass 2 1.0 
+
+group center_atom id 1
+fix freeze center_atom setforce 0.0 0.0 0.0 
+
+pair_style lj/cut 200 
+pair_coeff 1 1 1.0 0.8908987181403393 200 
+pair_coeff 2 2 1.0 1.007803979796764 200 
+pair_coeff 1 2 10.0 0.9493513489685516 200 
+# R* = 0.884 for CN 11
+
+pair_modify tail yes 
+
+thermo_style custom step pe ke etotal temp press density
+thermo 1
+thermo_modify norm no
+thermo_modify   flush yes 
+
+dump dump_name all custom 1 tmp.dump element x y z 
+dump_modify dump_name element Zr Cu
+dump_modify dump_name sort id
+
+minimize    1.0e-6 0 1000 10000

@@ -1,0 +1,61 @@
+units             lj
+atom_style        atomic
+boundary          p p p
+
+#variable l      equal 10.0793684
+#variable l      equal 12.5
+variable l      equal 18.5  # correct for 0.1 T (lj units); depends on lj parameters, including cutoff
+region      boxid block 0.0       ${l}      0.0       ${l}      0.0       ${l}
+create_box  2 boxid
+
+create_atoms    1 random 667  9879 boxid 
+create_atoms    2 random 333  8987 boxid
+
+mass        1 1.0
+mass        2 1.0
+
+#
+#  specify initial velocity of atoms
+#  group = all
+#  reduced temperature is T = 1.0 = lj-eps/kb 
+#  seed for random number generator
+#  distribution is gaussian (e.g. Maxwell-Boltzmann)
+#
+velocity    all create 1.0 87287 dist gaussian
+
+pair_style  lj/cut 6
+pair_coeff 1 1 10.0 1.7817974363 6
+pair_coeff 2 2 10.0 2.0156079596 6
+pair_coeff 1 2 12.0 1.8987026979 6
+
+dump dump_name all custom 100 tmp.dump element x y z 
+dump_modify dump_name element Zr Cu
+dump_modify dump_name sort id
+
+#thermo_style custom step pe ke etotal temp press density vol
+thermo_style custom step pe temp press lx
+thermo 100
+thermo_modify norm no
+
+minimize          1.0e-4 1.0e-6 10000 100000
+
+timestep 0.001
+
+fix md all nve
+run 1000
+unfix md
+
+#  thermostat controller gain = 0.1 (units of time, bigger is less tight control)
+fix md all npt temp 0.1 0.1 0.1 iso 1 1 1  # equilibrate at 10 T and 1 P
+run 50000
+unfix md
+
+fix md all npt temp 0.1 20 1.0 iso 1 1 1  # heat up to 10 T
+run 500000
+unfix md
+
+fix md all npt temp 20 0.1 1.0 iso 1 1 1  # cool down to 0.1 T
+run 500000
+unfix md
+
+minimize          1.0e-4 1.0e-6 10000 100000
